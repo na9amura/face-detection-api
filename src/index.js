@@ -1,9 +1,12 @@
-import * as PIXI from "pixi.js";
-import image from "./cat.jpeg";
-import { PixelateFilter } from "@pixi/filter-pixelate";
+import 'core-js/stable'
+import 'regenerator-runtime/runtime'
 
-const app = new PIXI.Application();
-document.body.appendChild(app.view);
+import * as PIXI from 'pixi.js'
+import image from './cat.jpeg'
+import { PixelateFilter } from '@pixi/filter-pixelate'
+
+const app = new PIXI.Application()
+document.body.appendChild(app.view)
 
 // app.loader.add('cat', image).load((loader, resources) => {
 //   // const cat = PIXI.Sprite.from('./cat.jpegg', { crossOrigin: true })
@@ -28,34 +31,47 @@ document.body.appendChild(app.view);
 // })
 
 const detectFace = async (element) => {
-  const detector = new FaceDetector();
-  const faces = await detector.detect(element);
-  console.log({ faces });
-  faces.forEach(({ boundingBox, landmarks }) => {
-    const { width, height, x, y } = boundingBox;
-    mask(element, 1, { width, height, x, y });
-  });
-};
+  const detector = new FaceDetector()
+  const faces = await detector.detect(element)
+  const boundingBox = faces[0].boundingBox
+  return boundingBox
+}
 
-const mask = (element, offset, { width, height, x, y }) => {
-  const texture = PIXI.Texture.from(element);
-  const sprite = new PIXI.Sprite(texture);
-  sprite.texture = texture;
-  sprite.width = width;
-  sprite.height = height;
-  sprite.position = { x: x + width / 2, y: y + height / 2 };
-  sprite.filters = [new PixelateFilter((16 * offset) >> 0)];
+const createSprite = (element, offset, width, height, x, y) => {
+  const texture = PIXI.Texture.from(element)
+  const sprite = new PIXI.Sprite(texture)
+  sprite.texture = texture
+  sprite.width = width
+  sprite.height = height
+  sprite.position = { x: x + width / 2, y: y + height / 2 }
+  sprite.filters = [new PixelateFilter((16 * offset) >> 0)]
 
-  app.stage.addChild(sprite);
-  return sprite;
-};
+  app.stage.addChild(sprite)
+  return sprite
+}
 
-const video = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  const video = document.getElementById("video");
-  video.srcObject = stream;
+const filter = async (element) => {
+  const { width, height, x, y } = await detectFace(element)
+  const sprite = createSprite(element, 1, width, height, x, y)
+  setInterval(async () => {
+    console.log('set interval')
+    const { width, height, x, y } = await detectFace(element)
+    sprite.position = { x: x + width / 2, y: y + height / 2 }
+  }, 1000 * 2)
+}
 
-  setInterval(() => detectFace(video), 3 * 1000);
-};
+const enableVideos = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+  const video = document.getElementById('video')
+  video.srcObject = stream
+  return video
+}
 
-video();
+const run = async () => {
+  const element = await enableVideos()
+  filter(element)
+}
+
+console.log({ PIXI, PixelateFilter })
+
+run()
