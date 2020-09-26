@@ -4,8 +4,10 @@ import 'regenerator-runtime/runtime'
 import * as PIXI from 'pixi.js'
 import { PixelateFilter } from '@pixi/filter-pixelate'
 
-const app = new PIXI.Application()
-document.body.appendChild(app.view)
+const size = { width: 640, height: 480 }
+const app = new PIXI.Application({ transparent: true, ...size })
+const player = document.getElementById('player')
+player.appendChild(app.view)
 
 const detectFace = async (detector, element) => {
   const faces = await detector.detect(element)
@@ -17,38 +19,50 @@ const detectFace = async (detector, element) => {
 }
 
 const createSprite = (element, offset, width, height, x, y) => {
-  const texture = PIXI.Texture.from(element)
+  console.log({ x, y, height, width })
+  // Make framed texture from whole element
+  // https://pixijs.download/dev/docs/PIXI.Texture.html#constructor
+  const baseTexture = PIXI.Texture.from(element)
+  const texture = new PIXI.Texture(
+    baseTexture,
+    new PIXI.Rectangle(x, y, width, height)
+  )
   const sprite = new PIXI.Sprite(texture)
   sprite.texture = texture
-  sprite.width = width
-  sprite.height = height
-  sprite.position = { x: x + width / 2, y: y + height / 2 }
+  sprite.position = { x, y }
   sprite.filters = [new PixelateFilter((16 * offset) >> 0)]
 
   app.stage.addChild(sprite)
-  return sprite
+  return [sprite, texture]
 }
 
 let sprite
+let texture
 
 const filter = async (element, detector) => {
   const { width, height, x, y } = await detectFace(detector, element)
-  sprite = createSprite(element, 1, width, height, x, y)
+  if (x || y) {
+    const [s, t] = createSprite(element, 1, width, height, x, y)
+    sprite = s
+    texture = t
+  }
 
   setInterval(async () => {
     const { width, height, x, y } = await detectFace(detector, element)
     if (!x || !y) return
 
-    if (!sprite) {
+    if (!sprite || !texture) {
       console.log('create sprite:', { x, y })
-      sprite = createSprite(element, 1, width, height, x, y)
+      const [s, t] = createSprite(element, 1, width, height, x, y)
+      sprite = s
+      texture = t
       return
     }
 
-    console.log('update sprite:', { sprite, x, y })
-    sprite.width = width
-    sprite.height = height
-    sprite.position = { x: x + width / 2, y: y + height / 2 }
+    console.log('update sprite:', sprite, { x, y, width, height })
+    texture.frame = new PIXI.Rectangle(x, y, width, height)
+    texture.updateUvs()
+    sprite.position = { x, y }
   }, 1000)
 }
 
