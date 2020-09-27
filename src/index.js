@@ -18,6 +18,18 @@ const detectFace = async (detector, element) => {
   return boundingBox
 }
 
+const createMaskGraphic = (x, y, width, height) => {
+  // Make ellipse mask around face. Texture cannot frame by ellipse or circle?
+  // https://pixijs.download/dev/docs/PIXI.Sprite.html#mask
+  const graphics = new PIXI.Graphics()
+  graphics.beginFill(0xffffff, 1)
+  graphics.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2)
+  graphics.endFill()
+  // app.stage.addChild(graphics)
+
+  return graphics
+}
+
 const createSprite = (element, offset, width, height, x, y) => {
   console.log({ x, y, height, width })
   // Make framed texture from whole element
@@ -31,15 +43,7 @@ const createSprite = (element, offset, width, height, x, y) => {
   const sprite = new PIXI.Sprite(texture)
   sprite.filters = [new PixelateFilter((16 * offset) >> 0)]
 
-  // Make ellipse mask around face. Texture cannot frame by ellipse or circle?
-  // https://pixijs.download/dev/docs/PIXI.Sprite.html#mask
-  const graphics = new PIXI.Graphics()
-  graphics.beginFill(0xffffff, 1)
-  graphics.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2)
-  graphics.endFill()
-  sprite.mask = graphics
-  // app.stage.addChild(graphics)
-
+  sprite.mask = createMaskGraphic(x, y, width, height)
   app.stage.addChild(sprite)
 
   return [sprite, texture]
@@ -69,9 +73,7 @@ const filter = async (element, detector) => {
     }
 
     console.log('update sprite:', sprite, { x, y, width, height })
-    // texture.frame = new PIXI.Ellipse(x, y, width, height)
-    // texture.updateUvs()
-    // sprite.position = { x, y }
+    sprite.mask = createMaskGraphic(x, y, width, height)
   }, 1000)
 }
 
