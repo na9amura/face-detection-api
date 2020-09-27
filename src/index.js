@@ -22,17 +22,26 @@ const createSprite = (element, offset, width, height, x, y) => {
   console.log({ x, y, height, width })
   // Make framed texture from whole element
   // https://pixijs.download/dev/docs/PIXI.Texture.html#constructor
-  const baseTexture = PIXI.Texture.from(element)
-  const texture = new PIXI.Texture(
-    baseTexture,
-    new PIXI.Rectangle(x, y, width, height)
-  )
+  // const baseTexture = PIXI.Texture.from(element)
+  // const texture = new PIXI.Texture(
+  //   baseTexture,
+  //   new PIXI.Ellipse(x, y, width, height)
+  // )
+  const texture = PIXI.Texture.from(element)
   const sprite = new PIXI.Sprite(texture)
-  sprite.texture = texture
-  sprite.position = { x, y }
   sprite.filters = [new PixelateFilter((16 * offset) >> 0)]
 
+  // Make ellipse mask around face. Texture cannot frame by ellipse or circle?
+  // https://pixijs.download/dev/docs/PIXI.Sprite.html#mask
+  const graphics = new PIXI.Graphics()
+  graphics.beginFill(0xffffff, 1)
+  graphics.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2)
+  graphics.endFill()
+  sprite.mask = graphics
+  // app.stage.addChild(graphics)
+
   app.stage.addChild(sprite)
+
   return [sprite, texture]
 }
 
@@ -60,9 +69,9 @@ const filter = async (element, detector) => {
     }
 
     console.log('update sprite:', sprite, { x, y, width, height })
-    texture.frame = new PIXI.Rectangle(x, y, width, height)
-    texture.updateUvs()
-    sprite.position = { x, y }
+    // texture.frame = new PIXI.Ellipse(x, y, width, height)
+    // texture.updateUvs()
+    // sprite.position = { x, y }
   }, 1000)
 }
 
