@@ -1,61 +1,97 @@
-import * as PIXI from "pixi.js";
-import image from "./cat.jpeg";
-import { PixelateFilter } from "@pixi/filter-pixelate";
+import 'core-js/stable'
+import 'regenerator-runtime/runtime'
 
-const app = new PIXI.Application();
-document.body.appendChild(app.view);
+import * as PIXI from 'pixi.js'
+import { PixelateFilter } from '@pixi/filter-pixelate'
 
-// app.loader.add('cat', image).load((loader, resources) => {
-//   // const cat = PIXI.Sprite.from('./cat.jpegg', { crossOrigin: true })
-//   const cat = new PIXI.Sprite(resources.cat.texture)
+const size = { width: 640, height: 480 }
+const app = new PIXI.Application({ transparent: true, ...size })
+const player = document.getElementById('player')
+player.appendChild(app.view)
 
-//   // Setup the position of the bunny
-//   cat.x = app.renderer.width / 2
-//   cat.y = app.renderer.height / 2
+const detectFace = async (detector, element) => {
+  const faces = await detector.detect(element)
+  if (!faces) return {}
+  if (!faces[0]) return {}
 
-//   // Rotate around the center
-//   cat.anchor.x = 0.5
-//   cat.anchor.y = 0.5
+  const boundingBox = faces[0].boundingBox
+  return boundingBox
+}
 
-//   // Add the bunny to the scene we are building
-//   app.stage.addChild(cat)
+const createMaskGraphic = (x, y, width, height) => {
+  // Make ellipse mask around face. Texture cannot frame by ellipse or circle?
+  // https://pixijs.download/dev/docs/PIXI.Sprite.html#mask
+  const graphics = new PIXI.Graphics()
+  graphics.beginFill(0xffffff, 1)
+  graphics.drawEllipse(x + width / 2, y + height / 2, width / 2, height / 2)
+  graphics.endFill()
+  // app.stage.addChild(graphics)
 
-//   // Listen for frame updates
-//   app.ticker.add(() => {
-//     // each frame we spin the bunny around a bit
-//     cat.rotation += 0.01
-//   })
-// })
+  return graphics
+}
 
-const detectFace = async (element) => {
-  const detector = new FaceDetector();
-  const faces = await detector.detect(element);
-  console.log({ faces });
-  faces.forEach(({ boundingBox, landmarks }) => {
-    const { width, height, x, y } = boundingBox;
-    mask(element, 1, { width, height, x, y });
-  });
-};
+const createSprite = (element, offset, width, height, x, y) => {
+  console.log({ x, y, height, width })
+  // Make framed texture from whole element
+  // https://pixijs.download/dev/docs/PIXI.Texture.html#constructor
+  // const baseTexture = PIXI.Texture.from(element)
+  // const texture = new PIXI.Texture(
+  //   baseTexture,
+  //   new PIXI.Ellipse(x, y, width, height)
+  // )
+  const texture = PIXI.Texture.from(element)
+  const sprite = new PIXI.Sprite(texture)
+  sprite.filters = [new PixelateFilter((16 * offset) >> 0)]
 
-const mask = (element, offset, { width, height, x, y }) => {
-  const texture = PIXI.Texture.from(element);
-  const sprite = new PIXI.Sprite(texture);
-  sprite.texture = texture;
-  sprite.width = width;
-  sprite.height = height;
-  sprite.position = { x: x + width / 2, y: y + height / 2 };
-  sprite.filters = [new PixelateFilter((16 * offset) >> 0)];
+  sprite.mask = createMaskGraphic(x, y, width, height)
+  app.stage.addChild(sprite)
 
-  app.stage.addChild(sprite);
-  return sprite;
-};
+  return [sprite, texture]
+}
 
-const video = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  const video = document.getElementById("video");
-  video.srcObject = stream;
+let sprite
+let texture
 
-  setInterval(() => detectFace(video), 3 * 1000);
-};
+const filter = async (element, detector) => {
+  const { width, height, x, y } = await detectFace(detector, element)
+  if (x || y) {
+    const [s, t] = createSprite(element, 1, width, height, x, y)
+    sprite = s
+    texture = t
+  }
 
-video();
+  setInterval(async () => {
+    const { width, height, x, y } = await detectFace(detector, element)
+    if (!x || !y) return
+
+    if (!sprite || !texture) {
+      console.log('create sprite:', { x, y })
+      const [s, t] = createSprite(element, 1, width, height, x, y)
+      sprite = s
+      texture = t
+      return
+    }
+
+    console.log('update sprite:', sprite, { x, y, width, height })
+    sprite.mask = createMaskGraphic(x, y, width, height)
+  }, 1000)
+}
+
+const enableVideos = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+  const video = document.getElementById('video')
+  video.srcObject = stream
+  return video
+}
+
+const run = async () => {
+  const element = await enableVideos()
+
+  const detector = new FaceDetector({
+    fastMode: true,
+    maxDetectedFaces: 1,
+  })
+  element.addEventListener('play', () => filter(element, detector))
+}
+
+run()
